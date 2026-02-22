@@ -162,6 +162,7 @@ AddEventHandler('sleet_example:depositCash', function(identifier, amount)
     if affected > 0 then
         print('存钱成功')
     else
+        -- cash < amount
         print('存钱失败')
     end
 end)
