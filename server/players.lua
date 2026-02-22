@@ -136,7 +136,8 @@ end
 -- ────────────────────────────────────────────────
 
 AddEventHandler('playerConnecting', function(name, _, deferrals)
-    local identifier = 'steam:' .. (GetPlayerIdentifier(source, 0) or 'unknown')
+    local src = source
+    local identifier = 'steam:' .. (GetPlayerIdentifier(src, 0) or 'unknown')
     deferrals.defer()
 
     local player = getPlayerByIdentifier(identifier)
@@ -152,12 +153,15 @@ AddEventHandler('playerConnecting', function(name, _, deferrals)
     deferrals.done()
 end)
 
-RegisterNetEvent('sleet_example:depositCash', function(amount)
-    local identifier = 'steam:' .. (GetPlayerIdentifier(source, 0) or 'unknown')
+AddEventHandler('sleet_example:depositCash', function(identifier, amount)
+    -- assert()
+    if not identifier then
+        return
+    end
     local affected   = depositCash(identifier, amount)
     if affected > 0 then
-        TriggerClientEvent('sleet_example:notify', source, ('已存入 $%d'):format(amount))
+        print('存钱成功')
     else
-        TriggerClientEvent('sleet_example:notify', source, '现金不足')
+        print('存钱失败')
     end
 end)

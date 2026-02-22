@@ -144,3 +144,14 @@ RegisterCommand('sleet_player', function(source, args)
         player.name, player.money, player.bank, player.job, tostring(player.is_admin)
     ))
 end, true)
+
+-- UPDATE 玩家金钱 原子
+RegisterCommand('sleet_money', function(source, args)
+    local identifier = args[1]
+    if not identifier then return print('用法: sleet_money <identifier> <amount>') end
+
+    local amount = tonumber(args[2]) or nil
+    if not amount or type(amount) ~= "number" then return print('请输入有效的数值') end
+
+    TriggerEvent('sleet_example:depositCash', identifier, amount)
+end)
