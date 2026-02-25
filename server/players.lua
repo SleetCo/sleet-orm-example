@@ -4,8 +4,9 @@
     展示：
       · SELECT 全字段/指定列/条件/分页
       · INSERT 并获取 insertId
-      · UPDATE 普通字段 & sl.sql() 原始表达式
-      · DELETE
+      · UPDATE 普通字段 & sl.sql() 原始表达式 & onUpdate 自动更新
+      · 软删除 (DELETE 自动转为 UPDATE deleted_at)
+      · withDeleted() 查询已删除记录
       · toSQL() 调试输出
       · 零 ---@type：LuaLS 全程推断 PlayersRecord / PlayersRecord[]
 --]]
@@ -124,10 +125,55 @@ local function paySalaryToAll(amount)
         .execute()
 end
 
---- 删除玩家
+--- 软删除玩家（实际执行 UPDATE deleted_at = NOW()）
 local function deletePlayer(identifier)
     return db.delete(s.players)
         .where(sl.eq(s.players.identifier, identifier))
+        .execute()
+end
+
+--- 获取已删除的玩家列表（包含软删除的记录）
+local function getDeletedPlayers()
+    return db.select()
+        .from(s.players)
+        .withDeleted()  -- 包含已删除记录
+        .where(sl.isNotNull(s.players.deleted_at))
+        .orderBy(s.players.deleted_at, 'desc')
+        .execute()
+end
+
+--- 恢复已删除的玩家（清除 deleted_at 时间戳）
+local function restorePlayer(identifier)
+    return db.update(s.players)
+        .set({ deleted_at = nil })
+        .where(sl.and_(
+            sl.eq(s.players.identifier, identifier),
+            sl.isNotNull(s.players.deleted_at)
+        ))
+        .execute()
+end
+
+--- 永久删除玩家（真正的物理删除，慎用！）
+local function forceDeletePlayer(identifier)
+    -- 注意：这会真正删除数据库记录，无法恢复
+    local sql = 'DELETE FROM `players` WHERE `identifier` = ?'
+    return MySQL.query.await(sql, { identifier })
+end
+
+--- 演示 onUpdate 功能：每次更新玩家信息时，last_seen 会自动更新
+local function touchPlayer(identifier)
+    -- 这个更新会自动触发 last_seen 的 onUpdate，设置为当前时间
+    return db.update(s.players)
+        .set({ name = sl.sql('`name`') })  -- 用原值更新name，触发onUpdate
+        .where(sl.eq(s.players.identifier, identifier))
+        .execute()
+end
+
+--- 批量插入示例
+local function createMultiplePlayers(playersData)
+    -- playersData = { {identifier='steam:xxx', name='Player1'}, ... }
+    return db.insert(s.players)
+        .values(playersData)
         .execute()
 end
 

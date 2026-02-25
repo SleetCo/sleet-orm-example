@@ -16,8 +16,9 @@ local players = sl.table('players', {
     is_admin   = sl.boolean().default(false).comment('是否为管理员'),
     job        = sl.varchar(64).default('unemployed').comment('当前职业'),
     metadata   = sl.json().comment('扩展数据（许可证、角色信息等）'),
-    last_seen  = sl.timestamp().defaultNow().comment('最后在线时间'),
+    last_seen  = sl.timestamp().defaultNow().onUpdate(sl.sql('NOW()')).comment('最后在线时间（自动更新）'),
     created_at = sl.timestamp().defaultNow().comment('账号创建时间'),
+    deleted_at = sl.timestamp().softDelete().comment('软删除时间戳'),
 })
 
 -- ──────────────────────────────────────────

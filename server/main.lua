@@ -107,6 +107,10 @@ AddEventHandler('onResourceStart', function(resourceName)
     print('[sleet_example] 资源启动完成 ✓')
 end)
 
+-- ────────────────────────────────────────────────
+-- 测试命令集合
+-- ────────────────────────────────────────────────
+
 -- 查询所有物品（供测试用）
 RegisterCommand('sleet_items', function(source)
     local items = db.select()
@@ -127,10 +131,9 @@ RegisterCommand('sleet_player', function(source, args)
     local identifier = args[1]
     if not identifier then return print('用法: sleet_player <identifier>') end
 
-    local sl_local = Sleet
     local rows = db.select()
         .from(s.players)
-        .where(sl_local.eq(s.players.identifier, identifier))
+        .where(sl.eq(s.players.identifier, identifier))
         .limit(1)
         .execute()
 
@@ -140,9 +143,118 @@ RegisterCommand('sleet_player', function(source, args)
     end
 
     -- player: PlayersRecord — IDE 可精确推断每个字段
-    print(('玩家: %s | 现金: $%d | 银行: $%d | 职业: %s | 管理员: %s'):format(
-        player.name, player.money, player.bank, player.job, tostring(player.is_admin)
+    print(('玩家: %s | 现金: $%d | 银行: $%d | 职业: %s | 管理员: %s | 删除状态: %s'):format(
+        player.name, player.money, player.bank, player.job, 
+        tostring(player.is_admin), player.deleted_at or '正常'
     ))
+end, true)
+
+-- 软删除玩家演示
+RegisterCommand('sleet_delete_player', function(source, args)
+    local identifier = args[1]
+    if not identifier then return print('用法: sleet_delete_player <identifier>') end
+
+    local affected = db.delete(s.players)
+        .where(sl.eq(s.players.identifier, identifier))
+        .execute()
+    
+    if affected > 0 then
+        print(('✓ 玩家 %s 已软删除'):format(identifier))
+    else
+        print('✗ 删除失败，玩家不存在')
+    end
+end, true)
+
+-- 恢复已删除玩家演示
+RegisterCommand('sleet_restore_player', function(source, args)
+    local identifier = args[1]
+    if not identifier then return print('用法: sleet_restore_player <identifier>') end
+
+    local affected = db.update(s.players)
+        .set({ deleted_at = nil })
+        .where(sl.and_(
+            sl.eq(s.players.identifier, identifier),
+            sl.isNotNull(s.players.deleted_at)
+        ))
+        .execute()
+    
+    if affected > 0 then
+        print(('✓ 玩家 %s 已恢复'):format(identifier))
+    else
+        print('✗ 恢复失败，玩家不存在或未被删除')
+    end
+end, true)
+
+-- 查看已删除玩家列表
+RegisterCommand('sleet_deleted_players', function(source)
+    local deletedPlayers = db.select()
+        .from(s.players)
+        .withDeleted()
+        .where(sl.isNotNull(s.players.deleted_at))
+        .orderBy(s.players.deleted_at, 'desc')
+        .execute()
+
+    print(('=== 已删除玩家列表 (%d 个) ==='):format(#deletedPlayers))
+    for _, player in ipairs(deletedPlayers) do
+        print(('- %s (%s) 删除时间: %s'):format(
+            player.name, player.identifier, player.deleted_at
+        ))
+    end
+end, true)
+
+-- onUpdate 演示：触摸玩家更新时间
+RegisterCommand('sleet_touch_player', function(source, args)
+    local identifier = args[1]
+    if not identifier then return print('用法: sleet_touch_player <identifier>') end
+
+    local affected = db.update(s.players)
+        .set({ name = sl.sql('`name`') })  -- 触发 onUpdate
+        .where(sl.eq(s.players.identifier, identifier))
+        .execute()
+    
+    if affected > 0 then
+        print(('✓ 玩家 %s 的 last_seen 已自动更新'):format(identifier))
+    else
+        print('✗ 更新失败，玩家不存在')
+    end
+end, true)
+
+-- 批量操作演示：创建测试玩家
+RegisterCommand('sleet_create_test_players', function(source)
+    local testPlayers = {
+        { identifier = 'steam:test1', name = '测试玩家1' },
+        { identifier = 'steam:test2', name = '测试玩家2' },
+        { identifier = 'steam:test3', name = '测试玩家3' },
+    }
+
+    local insertId = db.insert(s.players)
+        .values(testPlayers)
+        .execute()
+    
+    if insertId then
+        print(('✓ 批量创建了 %d 个测试玩家'):format(#testPlayers))
+    else
+        print('✗ 批量创建失败')
+    end
+end, true)
+
+-- 复杂查询演示：富有的玩家统计
+RegisterCommand('sleet_rich_stats', function(source)
+    ---@type { total: integer, avg_bank: number }[]
+    local stats = db.select({ 
+        sl.sql('COUNT(*) AS total'), 
+        sl.sql('AVG(bank) AS avg_bank') 
+    })
+        .from(s.players)
+        .where(sl.gt(s.players.bank, 10000))
+        .execute()
+
+    local stat = stats[1]
+    if stat then
+        print(('富有玩家统计: %d 人，平均银行余额: $%.2f'):format(
+            stat.total, stat.avg_bank
+        ))
+    end
 end, true)
 
 -- UPDATE 玩家金钱 原子
@@ -150,8 +262,8 @@ RegisterCommand('sleet_money', function(source, args)
     local identifier = args[1]
     if not identifier then return print('用法: sleet_money <identifier> <amount>') end
 
-    local amount = tonumber(args[2]) or nil
-    if not amount or type(amount) ~= "number" then return print('请输入有效的数值') end
+    local amount = tonumber(args[2])
+    if not amount then return print('请输入有效的数值') end
 
     TriggerEvent('sleet_example:depositCash', identifier, amount)
-end)
+end, true)

@@ -11,8 +11,9 @@ CREATE TABLE IF NOT EXISTS `players` (
     `is_admin` TINYINT(1) DEFAULT 0 COMMENT '是否为管理员',
     `job` VARCHAR(64) DEFAULT 'unemployed' COMMENT '当前职业',
     `metadata` JSON NULL COMMENT '扩展数据（许可证、角色信息等）',
-    `last_seen` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '最后在线时间',
+    `last_seen` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '最后在线时间（自动更新）',
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '账号创建时间',
+    `deleted_at` TIMESTAMP NULL COMMENT '软删除时间戳',
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
